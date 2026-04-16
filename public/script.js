@@ -1,11 +1,22 @@
 let bucketName = "";
 
+// 로그아웃 처리
+document.getElementById('logout-btn').onclick = () => {
+    window.location.href = '/_gcp_iap/clear_login_cookie';
+};
+
 async function loadFiles(path = '') {
     try {
         const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
         const data = await res.json();
-        bucketName = data.bucketName;
         
+        if (data.error) {
+            console.error("API Error:", data.error);
+            document.getElementById('header-bucket-name').innerText = "gs://error";
+            return;
+        }
+
+        bucketName = data.bucketName;
         document.getElementById('header-bucket-name').innerText = `gs://${bucketName}`;
         renderBreadcrumb(path);
         
@@ -39,7 +50,7 @@ async function loadFiles(path = '') {
             listBody.appendChild(tr);
         });
     } catch (error) {
-        console.error('로드 실패:', error);
+        console.error('Network Error:', error);
     }
 }
 
@@ -62,10 +73,18 @@ function showFileDetail(file) {
     document.getElementById('view-name').innerText = file.name;
     document.getElementById('view-path').innerText = `gs://${bucketName}/${file.fullPath}`;
     document.getElementById('view-type').innerText = file.contentType || 'unknown';
-    document.getElementById('view-size').innerText = (file.size / 1024).toFixed(2) + ' KB';
+    document.getElementById('view-size').innerText = formatBytes(file.size);
     document.getElementById('view-updated').innerText = new Date(file.updated).toLocaleString();
     document.getElementById('link-view').href = file.viewUrl;
     document.getElementById('link-download').href = file.downloadUrl;
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 document.getElementById('close-panel-btn').onclick = () => {

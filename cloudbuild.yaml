@@ -1,27 +1,47 @@
 steps:
   # 1. Docker 이미지 빌드
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/[REPOSITORY_NAME]/[IMAGE_NAME]:$COMMIT_SHA', '.']
+    args: [
+      'build', 
+      '-t', 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA', 
+      '.'
+    ]
 
-  # 2. Artifact Registry에 이미지 푸시
+  # 2. 이미지 푸시
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/[REPOSITORY_NAME]/[IMAGE_NAME]:$COMMIT_SHA']
+    args: [
+      'push', 
+      'asia-northeast3-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+    ]
 
-  # 3. Cloud Run에 배포
+  # 3. Cloud Run 배포 (네트워킹 및 보안 설정 반영)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - '[SERVICE_NAME]'
+      - '${_SERVICE_NAME}'
       - '--image'
-      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/[REPOSITORY_NAME]/[IMAGE_NAME]:$COMMIT_SHA'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
       - '--region'
       - 'asia-northeast3'
       - '--set-env-vars'
-      - 'BUCKET_NAME=[YOUR_BUCKET_NAME]'
+      - 'BUCKET_NAME=${_BUCKET_NAME}'
+      - '--service-account'
+      - '${_SERVICE_ACCOUNT_EMAIL}'
+      # --- 요청하신 네트워킹/보안 설정 ---
+      - '--ingress=all'                # 인그레스 : 전체
+      - '--no-allow-unauthenticated'   # 인증 : 인증 필요
+      # --------------------------------
       - '--platform'
       - 'managed'
 
-images:
-  - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/[REPOSITORY_NAME]/[IMAGE_NAME]:$COMMIT_SHA'
+substitutions:
+  _SERVICE_NAME: 'crs-gcs-filedownload-page-iap'
+  _REPO_NAME: 'cloud-run-source-deploy'
+  _IMAGE_NAME: 'gcs-filedownload-page-iap/crs-gcs-filedownload-page-iap'
+  _BUCKET_NAME: ' gcp-in-ca-test-bucket-wocheon07'
+  _SERVICE_ACCOUNT_EMAIL: 'gcs-manage-sa@gcp-in-ca.iam.gserviceaccount.com'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
