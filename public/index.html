@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCS Explorer</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+    <div class="header-title">GCS Explorer</div>
+    <div class="bucket-name-display" id="header-bucket-name">gs://loading...</div>
+</header>
+
+<div class="main">
+    <div class="content">
+        <div class="breadcrumb" id="breadcrumb-container">/</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 55%;">이름</th>
+                    <th style="width: 15%;">유형</th>
+                    <th style="width: 30%;">수정일</th>
+                </tr>
+            </thead>
+            <tbody id="file-list-body"></tbody>
+        </table>
+    </div>
+
+    <aside class="detail-panel" id="detail-side-panel">
+        <button class="close-btn" id="close-panel-btn" title="닫기">&times;</button>
+        <h2 id="view-name">파일 이름</h2>
+        <div class="info-group">
+            <span class="info-label">경로</span>
+            <span class="info-value" id="view-path"></span>
+        </div>
+        <hr>
+        <div class="info-group"><span class="info-label">유형</span><span id="view-type" class="info-value"></span></div>
+        <div class="info-group"><span class="info-label">크기</span><span id="view-size" class="info-value"></span></div>
+        <div class="info-group"><span class="info-label">최종 수정</span><span id="view-updated" class="info-value"></span></div>
+
+        <div class="action-group">
+            <a id="link-view" href="#" class="btn btn-view" target="_blank">브라우저에서 열기</a>
+            <a id="link-download" href="#" class="btn btn-download">파일 다운로드</a>
+        </div>
+    </aside>
+</div>
+
+<script src="/script.js" defer></script>
+</body>
+</html>
