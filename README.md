@@ -12,6 +12,7 @@ Google Cloud Storage(GCS) 버킷의 파일 및 폴더를 탐색하고, Signed UR
 -   파일 미리보기 (브라우저에서 열기)를 위한 Signed URL 생성
 -   파일 다운로드를 위한 Signed URL 생성
 -   SPA(Single Page Application) 형태로 구현된 동적 프론트엔드
+-   Google Cloud Build, Artifact Registry를 통한 CI/CD 구성
 
 ## 아키텍처
 
