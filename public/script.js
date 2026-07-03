@@ -1,10 +1,5 @@
 let bucketName = "";
 
-// 로그아웃 처리
-document.getElementById('logout-btn').onclick = () => {
-    window.location.href = '/_gcp_iap/clear_login_cookie';
-};
-
 async function loadFiles(path = '') {
     try {
         const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`);

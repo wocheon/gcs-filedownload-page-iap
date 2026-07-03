@@ -3,7 +3,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
-      '-t', 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA', 
+      '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA', 
       '.'
     ]
 
@@ -11,10 +11,10 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'push', 
-      'asia-northeast3-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+      '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
     ]
 
-  # 3. Cloud Run 배포 (네트워킹 및 보안 설정 반영)
+  # 3. Cloud Run 배포 (내부 HTTP Load Balancer 연동 전제)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -22,25 +22,25 @@ steps:
       - 'deploy'
       - '${_SERVICE_NAME}'
       - '--image'
-      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_IMAGE_NAME}:$COMMIT_SHA'
       - '--region'
-      - 'asia-northeast3'
+      - '${_REGION}'
       - '--set-env-vars'
       - 'BUCKET_NAME=${_BUCKET_NAME}'
       - '--service-account'
       - '${_SERVICE_ACCOUNT_EMAIL}'
-      # --- 요청하신 네트워킹/보안 설정 ---
-      - '--ingress=all'                # 인그레스 : 전체
-      - '--no-allow-unauthenticated'   # 인증 : 인증 필요
-      # --------------------------------
+      # 내부 HTTP Load Balancer를 통해서만 접근하는 구성
+      - '--ingress=internal-and-cloud-load-balancing'
+      - '--allow-unauthenticated'
       - '--platform'
       - 'managed'
 
 substitutions:
   _SERVICE_NAME: 'crs-gcs-filedownload-page-iap'
+  _REGION: 'asia-northeast3'
   _REPO_NAME: 'cloud-run-source-deploy'
   _IMAGE_NAME: 'gcs-filedownload-page-iap/crs-gcs-filedownload-page-iap'
-  _BUCKET_NAME: ' gcp-in-ca-test-bucket-wocheon07'
+  _BUCKET_NAME: 'gcp-in-ca-test-bucket-wocheon07'
   _SERVICE_ACCOUNT_EMAIL: 'gcs-manage-sa@gcp-in-ca.iam.gserviceaccount.com'
 
 options:

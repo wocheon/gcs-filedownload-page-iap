@@ -1,157 +1,182 @@
-# GCS 파일 다운로드 웹 서비스 (Cloud Run)
+# GCS 파일 다운로드 웹 서비스 (Cloud Run + IAP)
 
-Google Cloud Storage(GCS) 버킷의 파일 및 폴더를 탐색하고, Signed URL을 통해 안전하게 파일을 보거나 다운로드할 수 있는 웹 애플리케이션입니다. Google Cloud Run에 컨테이너 형태로 배포하여 서버리스 환경에서 손쉽게 운영할 수 있습니다.
+Google Cloud Storage(GCS) 버킷의 파일과 폴더를 웹에서 탐색하고, v4 Signed URL을 통해 파일을 브라우저에서 열거나 다운로드할 수 있는 Node.js/Express 애플리케이션입니다. Cloud Run에 컨테이너로 배포하고, Application Load Balancer와 Identity-Aware Proxy(IAP)를 통해 인증된 사용자만 접근하는 구성을 전제로 합니다.
 
-## 아키텍쳐 구성 
+## 아키텍처 구성
 
-![alt text](image.png)
+![아키텍처 구성도](image.png)
+
+사용자는 HTTP 트래픽으로 Application Load Balancer에 접근하고, IAP가 Google 계정 인증과 IAM 기반 권한 검사를 수행합니다. 인가된 요청만 Cloud Run 서비스로 전달되며, Cloud Run은 서비스 계정 권한으로 Cloud Storage 객체 목록을 조회하고 파일별 Signed URL을 생성합니다.
+
+CI/CD 흐름은 코드 커밋 후 Cloud Build가 컨테이너 이미지를 빌드하고 Artifact Registry에 푸시한 뒤, 해당 이미지를 Cloud Run에 배포하는 방식입니다. `cloudbuild.yaml`은 이미지 빌드, 푸시, Cloud Run 배포까지 수행하며, Application Load Balancer, IAP, Serverless NEG, IAM 접근 정책은 별도로 구성해야 합니다.
 
 ## 주요 기능
 
--   GCS 버킷 내 파일/폴더 계층 구조 탐색
--   파일 미리보기 (브라우저에서 열기)를 위한 Signed URL 생성
--   파일 다운로드를 위한 Signed URL 생성
--   SPA(Single Page Application) 형태로 구현된 동적 프론트엔드
--   Google Cloud Build, Artifact Registry를 통한 CI/CD 구성
+- GCS 버킷의 폴더/파일 계층 탐색
+- 파일 미리보기용 v4 Signed URL 생성
+- 파일 다운로드용 v4 Signed URL 생성
+- 선택한 파일의 경로, 유형, 크기, 수정일 표시
+- Application Load Balancer와 IAP를 통한 인증/인가 기반 접근
+- Cloud Build, Artifact Registry, Cloud Run 배포 구성
 
-## 아키텍처
+## 파일 구성
 
--   **Client (Browser)**: `public/` 디렉토리의 HTML, CSS, JavaScript 파일
--   **Backend (Cloud Run)**: Node.js/Express 기반 서버
-    -   GCS API를 호출하여 파일 목록 조회
-    -   파일 접근을 위한 v4 Signed URL 생성
--   **Storage**: Google Cloud Storage 버킷
+- `index.js`: Express 서버 진입점입니다. 정적 파일을 서빙하고 `/api/files`에서 GCS 객체 목록과 Signed URL을 반환합니다.
+- `public/index.html`: GCS Explorer 화면의 HTML 구조입니다.
+- `public/script.js`: 파일 목록 조회, breadcrumb 이동, 상세 패널 표시를 담당합니다.
+- `public/style.css`: 화면 레이아웃과 테이블/상세 패널 스타일입니다.
+- `public/favicon.png`: 브라우저 탭에 표시되는 favicon 이미지입니다.
+- `Dockerfile`: Node.js 20 기반 Cloud Run 컨테이너 이미지를 빌드합니다.
+- `cloudbuild.yaml`: Docker 이미지 빌드/푸시 후 Cloud Run에 배포하는 Cloud Build 설정입니다.
+- `.dockerignore`: 컨테이너 빌드에서 제외할 파일 목록입니다.
+- `image.png`: README에서 사용하는 아키텍처 이미지입니다.
+
+## 동작 방식
+
+1. 사용자가 Application Load Balancer 주소로 접속합니다.
+2. IAP가 Google 계정 인증을 수행하고, IAM 정책에 따라 접근 권한을 확인합니다.
+3. 권한이 있는 요청이 Cloud Run 서비스로 전달됩니다.
+4. 브라우저가 `/api/files?path=...` API를 호출합니다.
+5. 서버가 `BUCKET_NAME` 환경변수에 지정된 GCS 버킷에서 prefix/delimiter 방식으로 폴더와 파일을 조회합니다.
+6. 서버가 각 파일에 대해 15분 동안 유효한 Signed URL을 생성합니다.
+7. 프론트엔드는 파일 목록과 상세 정보를 표시하고, 열기/다운로드 버튼에 Signed URL을 연결합니다.
 
 ## 배포 전 준비사항
 
-1.  **Google Cloud SDK (gcloud CLI)**: 로컬 환경에 gcloud CLI를 설치하고 인증합니다.
-    ```bash
-    gcloud auth login
-    gcloud config set project [YOUR_PROJECT_ID]
-    ```
+### 1. Google Cloud SDK 인증
 
-2.  **Docker**: 컨테이너 이미지를 빌드하기 위해 Docker를 설치합니다.
+```bash
+gcloud auth login
+gcloud config set project [YOUR_PROJECT_ID]
+```
 
-3.  **GCS Bucket**: 파일을 저장할 GCS 버킷을 생성합니다.
+### 2. GCS 버킷 생성
 
-4.  **IAM 서비스 계정**: Cloud Run이 GCS에 접근하고 Signed URL을 생성하기 위해 사용할 서비스 계정을 생성하고 필요한 권한을 부여합니다.
-    -   **필요 IAM 역할**:
-        -   `Storage 개체 뷰어 (roles/storage.objectViewer)`: 버킷의 객체를 읽고 목록을 가져오기 위한 권한입니다.
-        -   `서비스 계정 토큰 생성자 (roles/iam.serviceAccountTokenCreator)`: 서비스 계정 자체에 이 역할을 부여하여 v4 Signed URL을 생성할 수 있도록 합니다.
+파일을 저장할 GCS 버킷을 준비합니다.
 
-    ```bash
-    # 서비스 계정 생성
-    gcloud iam service-accounts create gcs-downloader-sa --display-name="GCS Downloader Service Account"
+### 3. 서비스 계정 및 IAM 권한
 
-    # 서비스 계정에 권한 부여
-    gcloud projects add-iam-policy-binding [YOUR_PROJECT_ID] \
-      --member="serviceAccount:gcs-downloader-sa@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
-      --role="roles/storage.objectViewer"
+Cloud Run이 GCS 객체를 조회하고 Signed URL을 생성할 수 있도록 실행 서비스 계정에 권한을 부여합니다.
 
-    gcloud iam service-accounts add-iam-policy-binding gcs-downloader-sa@[YOUR_PROJECT_ID].iam.gserviceaccount.com \
-      --member="serviceAccount:gcs-downloader-sa@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
-      --role="roles/iam.serviceAccountTokenCreator"
-    ```
+필요한 역할:
 
-## 로컬 설정 및 파일 구성
+- `roles/storage.objectViewer`: 버킷 객체 목록 조회 및 읽기
+- `roles/iam.serviceAccountTokenCreator`: v4 Signed URL 서명 생성
 
-배포를 진행하기 전에, 프로젝트 루트 디렉토리에 `package.json` 파일을 설치하고 `Dockerfile`을 생성해야 합니다.
+```bash
+gcloud iam service-accounts create gcs-manage-sa \
+  --display-name="GCS Manage Service Account"
 
-### 1. `package.json` 의존성 설치
+gcloud projects add-iam-policy-binding [YOUR_PROJECT_ID] \
+  --member="serviceAccount:gcs-manage-sa@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+  --role="roles/storage.objectViewer"
 
-프로젝트에 `package.json` 파일이 있다면, 터미널에서 다음 명령어를 실행하여 의존성을 설치합니다.
+gcloud iam service-accounts add-iam-policy-binding \
+  gcs-manage-sa@[YOUR_PROJECT_ID].iam.gserviceaccount.com \
+  --member="serviceAccount:gcs-manage-sa@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator"
+```
+
+### 4. IAP 및 Load Balancer 구성
+
+Cloud Run 서비스 앞단에 Application Load Balancer와 Serverless NEG를 구성하고, IAP를 활성화합니다. IAP 접근 대상 사용자 또는 그룹에는 IAP-secured Web App User 권한을 부여해야 합니다.
+
+Cloud Run 배포 설정은 ingress를 `internal-and-cloud-load-balancing`으로 제한하고 `--allow-unauthenticated`를 사용합니다. 이 값은 Cloud Run 자체 인증을 끄고 Load Balancer/IAP 레이어에서 접근을 제어하기 위한 설정입니다. 외부에 직접 공개하는 구성으로 전환할 경우에는 HTTPS, 도메인, 인증, 접근 제어 정책을 별도로 재검토해야 합니다.
+
+## 로컬 실행
+
+Application Default Credentials가 GCS 접근 권한을 가진 계정으로 설정되어 있어야 합니다.
+
 ```bash
 npm install
+export BUCKET_NAME=[YOUR_BUCKET_NAME]
+npm start
 ```
 
-### 2. `Dockerfile` 생성
+Windows PowerShell에서는 다음처럼 환경변수를 설정합니다.
 
-Cloud Run에서 실행할 컨테이너 이미지를 빌드하기 위한 `Dockerfile`을 생성합니다.
-
-```dockerfile
-# Use an official Node.js runtime as a parent image
-FROM node:18-slim
-
-# Create and change to the app directory.
-WORKDIR /usr/src/app
-
-# Copy application dependency manifests to the container image.
-# A wildcard is used to ensure both package.json AND package-lock.json are copied.
-# Copying this first prevents re-running npm install on every code change.
-COPY package*.json ./
-
-# Install production dependencies.
-RUN npm install --only=production
-
-# Copy local code to the container image.
-COPY . .
-
-# The service listens on port 8080, which is the default for Cloud Run.
-# You can use the PORT environment variable to change this.
-ENV PORT 8080
-
-# Run the web service on container startup.
-CMD [ "npm", "start" ]
+```powershell
+npm install
+$env:BUCKET_NAME="[YOUR_BUCKET_NAME]"
+npm start
 ```
 
-## Cloud Run 배포 방법
+기본 포트는 `8080`입니다. 실행 후 `http://localhost:8080`으로 접속합니다.
+
+## 수동 배포
 
 ### 1. Artifact Registry 저장소 생성
 
-Docker 이미지를 저장할 Artifact Registry 저장소를 생성합니다. (이미 있는 경우 생략)
+이미 저장소가 있다면 생략할 수 있습니다.
 
 ```bash
-gcloud artifacts repositories create gcs-file-repo \
-    --repository-format=docker \
-    --location=asia-northeast3 \
-    --description="Docker repository for GCS file download app"
+gcloud artifacts repositories create cloud-run-source-deploy \
+  --repository-format=docker \
+  --location=asia-northeast3 \
+  --description="Docker repository for Cloud Run source deployments"
 ```
 
 ### 2. Docker 인증
-
-Artifact Registry에 이미지를 Push할 수 있도록 Docker 클라이언트를 인증합니다.
 
 ```bash
 gcloud auth configure-docker asia-northeast3-docker.pkg.dev
 ```
 
-### 3. Docker 이미지 빌드 및 Push
-
-`Dockerfile`을 사용하여 이미지를 빌드하고 Artifact Registry에 Push합니다.
+### 3. 이미지 빌드 및 푸시
 
 ```bash
-# 변수 설정
 export PROJECT_ID=$(gcloud config get-value project)
-export REPO_NAME=gcs-file-repo
-export IMAGE_NAME=gcs-file-downloader
 export REGION=asia-northeast3
+export REPO_NAME=cloud-run-source-deploy
+export IMAGE_NAME=gcs-filedownload-page-iap/crs-gcs-filedownload-page-iap
 export IMAGE_TAG=${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest
 
-# 이미지 빌드
 docker build -t ${IMAGE_TAG} .
-
-# 이미지 Push
 docker push ${IMAGE_TAG}
 ```
 
-### 4. Cloud Run 서비스 배포
-
-Push한 이미지를 사용하여 Cloud Run 서비스를 배포합니다.
-
--   `[YOUR_BUCKET_NAME]`: 준비사항에서 생성한 GCS 버킷 이름으로 변경하세요.
--   `[YOUR_SERVICE_ACCOUNT_EMAIL]`: 준비사항에서 생성한 서비스 계정 이메일로 변경하세요. (`gcs-downloader-sa@[YOUR_PROJECT_ID].iam.gserviceaccount.com`)
+### 4. Cloud Run 배포
 
 ```bash
-gcloud run deploy gcs-file-downloader-service \
+gcloud run deploy crs-gcs-filedownload-page-iap \
   --image=${IMAGE_TAG} \
   --platform=managed \
   --region=${REGION} \
+  --ingress=internal-and-cloud-load-balancing \
   --allow-unauthenticated \
   --set-env-vars="BUCKET_NAME=[YOUR_BUCKET_NAME]" \
   --service-account=[YOUR_SERVICE_ACCOUNT_EMAIL]
 ```
 
--   `--allow-unauthenticated`: 모든 사용자가 웹 페이지에 접근할 수 있도록 허용합니다. 내부용으로만 사용하려면 이 옵션을 제거하고 IAP(Identity-Aware Proxy) 설정을 고려하세요.
+## Cloud Build 배포
 
-배포가 완료되면 출력된 서비스 URL로 접속하여 GCS 파일 목록을 확인할 수 있습니다.
+`cloudbuild.yaml`은 다음 작업을 수행합니다.
 
+1. Docker 이미지 빌드
+2. Artifact Registry로 이미지 푸시
+3. Cloud Run 서비스 배포
+
+배포 전에 `cloudbuild.yaml`의 substitutions 값을 환경에 맞게 확인하세요.
+
+- `_SERVICE_NAME`: Cloud Run 서비스 이름
+- `_REGION`: Cloud Run 및 Artifact Registry 리전
+- `_REPO_NAME`: Artifact Registry 저장소 이름
+- `_IMAGE_NAME`: Artifact Registry에 저장될 이미지 경로와 이름
+- `_BUCKET_NAME`: 조회할 GCS 버킷 이름
+- `_SERVICE_ACCOUNT_EMAIL`: Cloud Run 실행 서비스 계정
+
+현재 파일에는 다음 기본값이 들어 있습니다.
+
+- `_SERVICE_NAME`: `crs-gcs-filedownload-page-iap`
+- `_REGION`: `asia-northeast3`
+- `_REPO_NAME`: `cloud-run-source-deploy`
+- `_IMAGE_NAME`: `gcs-filedownload-page-iap/crs-gcs-filedownload-page-iap`
+- `_BUCKET_NAME`: `gcp-in-ca-test-bucket-wocheon07`
+- `_SERVICE_ACCOUNT_EMAIL`: `gcs-manage-sa@gcp-in-ca.iam.gserviceaccount.com`
+
+## 주의사항
+
+- Signed URL은 현재 코드 기준 15분 동안 유효합니다.
+- `BUCKET_NAME` 환경변수가 없거나 서비스 계정 권한이 부족하면 `/api/files`에서 오류가 발생합니다.
+- Application Load Balancer, IAP, Serverless NEG, IAP IAM 정책은 `cloudbuild.yaml`에서 생성하지 않으므로 별도로 구성해야 합니다.
+- `--allow-unauthenticated`는 Cloud Run 직접 공개 목적이 아니라 IAP가 있는 Load Balancer 앞단 구성을 위한 설정으로 사용합니다.
