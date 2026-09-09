@@ -7,6 +7,10 @@ services:
     restart: unless-stopped
     environment:
       BUCKET_NAMES: ${BUCKET_NAMES:?Set BUCKET_NAMES in .env}
+      LOGIN_USERNAME: "${LOGIN_USERNAME:-admin}"
+      LOGIN_PASSWORD: "${LOGIN_PASSWORD:-#cloud01}"
+      SESSION_TTL_HOURS: "${SESSION_TTL_HOURS:-8}"
+      TRUST_PROXY: "${TRUST_PROXY:-false}"
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-service-account.json
       PORT: "8080"
     volumes:

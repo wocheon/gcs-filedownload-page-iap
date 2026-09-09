@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 - GCS Explorer</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/login.css">
+</head>
+<body>
+  <main class="login-card">
+    <div class="brand">GCS Explorer</div>
+    <h1>로그인</h1>
+    <p class="description">파일 탐색기를 사용하려면 로그인하세요.</p>
+    <div class="error-message" id="login-error" role="alert" hidden></div>
+    <form action="/login" method="post">
+      <label for="username">아이디</label>
+      <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+      <label for="password">비밀번호</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit">로그인</button>
+    </form>
+  </main>
+  <script src="/login.js" defer></script>
+</body>
+</html>

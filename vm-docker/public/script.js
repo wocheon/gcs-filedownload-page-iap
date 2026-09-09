@@ -15,6 +15,10 @@ function setError(message = '') {
 
 async function requestJson(url) {
   const response = await fetch(url);
+  if (response.status === 401) {
+    window.location.assign('/login');
+    throw new Error('로그인이 필요합니다.');
+  }
   const data = await response.json();
 
   if (!response.ok || data.error) {
@@ -182,4 +186,3 @@ document.getElementById('close-panel-btn').addEventListener('click', () => {
 });
 
 loadBuckets();
-

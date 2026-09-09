@@ -9,6 +9,8 @@
 - `.env.example`: 버킷, 호스트 포트, 바인딩 주소 예시입니다.
 - `index.js`, `package.json`, `public/`: 컨테이너에서 실행하는 애플리케이션 전체 소스입니다.
 
+VM 버전에는 IAP 대신 자체 로그인 화면이 적용됩니다. 로그인 전에는 메인 화면과 GCS API 모두 접근할 수 없으며, 세션은 `HttpOnly`, `SameSite=Strict` 쿠키로 유지됩니다. 로그인 5회 연속 실패 시 해당 클라이언트는 15분 동안 잠깁니다.
+
 Docker 빌드 컨텍스트는 현재 디렉터리(`.`)입니다. 상위 디렉터리 파일, Cloud Build, Artifact Registry를 사용하지 않습니다.
 
 ## 서비스 계정 키 준비
@@ -38,8 +40,12 @@ cp .env.example .env
 
 ```dotenv
 BUCKET_NAMES=bucket-a,bucket-b,bucket-c
+LOGIN_USERNAME=admin
+LOGIN_PASSWORD="#cloud01"
 GOOGLE_APPLICATION_CREDENTIALS_HOST_PATH=/opt/gcs-filedownload-page/secrets/service-account.json
 ```
+
+초기 로그인 정보는 `admin` / `#cloud01`입니다. 내부 서비스라도 가능하면 `.env`의 `LOGIN_PASSWORD`를 다른 값으로 변경하십시오. 비밀번호에 `#`이 포함되므로 예시처럼 큰따옴표를 유지하는 편이 안전합니다.
 
 그다음 실행합니다.
 
@@ -61,6 +67,8 @@ Nginx 또는 다른 리버스 프록시가 같은 VM에서 HTTPS를 종료하도
 BIND_ADDRESS=0.0.0.0
 ```
 
+HTTPS 리버스 프록시가 컨테이너 바로 앞에 있고 `X-Forwarded-Proto`를 올바르게 전달한다면 `.env`에 `TRUST_PROXY=true`를 지정합니다. 이 경우 HTTPS 요청의 세션 쿠키에 `Secure` 속성이 자동으로 적용됩니다. 신뢰할 수 없는 프록시를 경유하거나 애플리케이션 포트를 직접 외부에 열어 둔 상태에서는 이 값을 켜지 마십시오.
+
 ## 운영 명령
 
 ```bash
@@ -81,5 +89,6 @@ docker-compose down
 - `.env`에는 키 자체가 아니라 VM에 있는 키 파일의 절대 경로만 기록합니다.
 - 키 파일은 `0400` 권한으로 제한하고 정기적으로 교체합니다.
 - 기존 Cloud Run 앞단의 IAP 보호는 VM에 자동 적용되지 않습니다. 외부 공개 시 HTTPS 리버스 프록시와 별도의 인증/인가를 구성해야 합니다.
+- 현재 로그인 세션은 컨테이너 메모리에만 저장되므로 컨테이너 재시작 시 모든 사용자가 로그아웃됩니다.
 - `BUCKET_NAMES`는 쉼표로 구분하며 여기에 없는 버킷은 API 요청으로 직접 지정해도 거부됩니다.
 - GCS 조회 또는 Signed URL 접근이 실패하면 JSON 키의 서비스 계정이 각 대상 버킷에 `roles/storage.objectViewer` 역할을 가지고 있는지 확인합니다.

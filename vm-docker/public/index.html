@@ -12,6 +12,9 @@
     <div class="header-title">GCS Explorer</div>
     <div class="header-right">
       <div class="bucket-name-display" id="header-bucket-name">버킷 선택</div>
+      <form action="/logout" method="post">
+        <button class="logout-btn" type="submit">로그아웃</button>
+      </form>
     </div>
   </header>
 
@@ -42,9 +45,9 @@
         <table>
           <thead>
             <tr>
-              <th style="width: 55%;">이름</th>
-              <th style="width: 15%;">유형</th>
-              <th style="width: 30%;">수정일</th>
+              <th class="name-column">이름</th>
+              <th class="type-column">유형</th>
+              <th class="updated-column">수정일</th>
             </tr>
           </thead>
           <tbody id="file-list-body"></tbody>
