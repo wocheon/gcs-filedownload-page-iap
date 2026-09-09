@@ -2,11 +2,17 @@ const express = require('express');
 const { Storage } = require('@google-cloud/storage');
 const path = require('path');
 
-const bucketName = process.env.BUCKET_NAME;
 const port = Number(process.env.PORT || 8080);
+const bucketNames = [...new Set(
+  (process.env.BUCKET_NAMES || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+)];
+const allowedBuckets = new Set(bucketNames);
 
-if (!bucketName) {
-  console.error('BUCKET_NAME environment variable is required.');
+if (bucketNames.length === 0) {
+  console.error('BUCKET_NAMES environment variable is required.');
   process.exit(1);
 }
 
@@ -21,9 +27,22 @@ app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+app.get('/api/buckets', (req, res) => {
+  res.json({ buckets: bucketNames.map((name) => ({ name })) });
+});
+
 app.get('/api/files', async (req, res) => {
   try {
+    const bucketName = req.query.bucket;
+    if (typeof bucketName !== 'string' || !allowedBuckets.has(bucketName)) {
+      return res.status(400).json({ error: '허용된 버킷을 선택해야 합니다.' });
+    }
+
     const prefix = req.query.path || '';
+    if (typeof prefix !== 'string') {
+      return res.status(400).json({ error: '잘못된 객체 경로입니다.' });
+    }
+
     const [files, , apiResponse] = await storage.bucket(bucketName).getFiles({
       prefix,
       delimiter: '/'

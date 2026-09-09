@@ -13,7 +13,7 @@ Docker 빌드 컨텍스트는 현재 디렉터리(`.`)입니다. 상위 디렉�
 
 ## 서비스 계정 키 준비
 
-VM에 기본으로 연결된 서비스 계정 대신 별도의 서비스 계정 JSON 키를 사용합니다. 서비스 계정에는 대상 버킷의 `roles/storage.objectViewer` 역할이 필요합니다.
+VM에 기본으로 연결된 서비스 계정 대신 별도의 서비스 계정 JSON 키를 사용합니다. 서비스 계정에는 `BUCKET_NAMES`에 지정한 각 버킷의 `roles/storage.objectViewer` 역할이 필요합니다. 버킷 목록은 환경변수에서 가져오므로 `storage.buckets.list` 권한은 필요하지 않습니다.
 
 키 파일은 프로젝트 외부의 전용 디렉터리에 저장합니다. 아래 예시는 컨테이너의 `node` 사용자 UID/GID인 `1000:1000`만 키를 읽을 수 있게 설정합니다.
 
@@ -37,7 +37,7 @@ cp .env.example .env
 `.env`에서 다음 값을 실제 환경에 맞게 변경합니다.
 
 ```dotenv
-BUCKET_NAME=your-bucket-name
+BUCKET_NAMES=bucket-a,bucket-b,bucket-c
 GOOGLE_APPLICATION_CREDENTIALS_HOST_PATH=/opt/gcs-filedownload-page/secrets/service-account.json
 ```
 
@@ -81,4 +81,5 @@ docker-compose down
 - `.env`에는 키 자체가 아니라 VM에 있는 키 파일의 절대 경로만 기록합니다.
 - 키 파일은 `0400` 권한으로 제한하고 정기적으로 교체합니다.
 - 기존 Cloud Run 앞단의 IAP 보호는 VM에 자동 적용되지 않습니다. 외부 공개 시 HTTPS 리버스 프록시와 별도의 인증/인가를 구성해야 합니다.
-- GCS 조회 또는 Signed URL 접근이 실패하면 JSON 키의 서비스 계정이 대상 버킷에 `roles/storage.objectViewer` 역할을 가지고 있는지 확인합니다.
+- `BUCKET_NAMES`는 쉼표로 구분하며 여기에 없는 버킷은 API 요청으로 직접 지정해도 거부됩니다.
+- GCS 조회 또는 Signed URL 접근이 실패하면 JSON 키의 서비스 계정이 각 대상 버킷에 `roles/storage.objectViewer` 역할을 가지고 있는지 확인합니다.

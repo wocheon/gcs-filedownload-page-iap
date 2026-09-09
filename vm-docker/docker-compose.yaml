@@ -6,7 +6,7 @@ services:
     init: true
     restart: unless-stopped
     environment:
-      BUCKET_NAME: ${BUCKET_NAME:?Set BUCKET_NAME in .env}
+      BUCKET_NAMES: ${BUCKET_NAMES:?Set BUCKET_NAMES in .env}
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-service-account.json
       PORT: "8080"
     volumes:

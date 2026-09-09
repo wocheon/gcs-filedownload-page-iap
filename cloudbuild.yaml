@@ -26,7 +26,8 @@ steps:
       - '--region'
       - '${_REGION}'
       - '--set-env-vars'
-      - 'BUCKET_NAME=${_BUCKET_NAME}'
+      # ^@^ 구분자를 사용하여 쉼표가 포함된 버킷 목록을 하나의 값으로 전달
+      - '^@^BUCKET_NAMES=${_BUCKET_NAMES}'
       - '--service-account'
       - '${_SERVICE_ACCOUNT_EMAIL}'
       # 내부 HTTP Load Balancer를 통해서만 접근하는 구성
@@ -40,7 +41,7 @@ substitutions:
   _REGION: 'asia-northeast3'
   _REPO_NAME: 'cloud-run-source-deploy'
   _IMAGE_NAME: 'gcs-filedownload-page-iap/crs-gcs-filedownload-page-iap'
-  _BUCKET_NAME: 'gcp-in-ca-test-bucket-wocheon07'
+  _BUCKET_NAMES: 'gcp-in-ca-test-bucket-wocheon07'
   _SERVICE_ACCOUNT_EMAIL: 'gcs-manage-sa@gcp-in-ca.iam.gserviceaccount.com'
 
 options:
